@@ -41,10 +41,10 @@ def build_rag_pipeline(file_path):
 
     # Try Ollama LLM setup
     print("\nSetting up Ollama LLM...")
-    # llm = model.setup_ollama_llm()
+    llm = model.setup_ollama_llm()
 
-    # if llm is None:
-    #     raise RuntimeError("No LLM could be initialized.")
+    if llm is None:
+        raise RuntimeError("No LLM could be initialized.")
 
     return hybrid_retriever, None
 
