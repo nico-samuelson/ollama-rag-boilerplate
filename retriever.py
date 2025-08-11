@@ -6,12 +6,12 @@ from langchain_community.vectorstores import Chroma
 def setup_gpu_embeddings(chunks):
     try:
         device = "cuda" if torch.cuda.is_available() else "cpu"
+        # device = torch.device("mps") # USE THIS WHILE RUNNING ON MAC SYSTEM
 
         embeddings = SentenceTransformerEmbeddings(
             model_name=hp.EMBEDDING_NAME,
             model_kwargs={'device': device, "trust_remote_code": True},
             encode_kwargs={'batch_size': 32 if device == "cuda" else 16, "trust_remote_code": True},
-            # trust_remote_code=True
         )
 
         persist_directory = "./chroma_db"

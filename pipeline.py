@@ -46,7 +46,7 @@ def build_rag_pipeline(file_path):
     if llm is None:
         raise RuntimeError("No LLM could be initialized.")
 
-    return hybrid_retriever, None
+    return hybrid_retriever, llm
 
 def format_docs(docs):
     formatted = []
