@@ -1,10 +1,9 @@
 import json
 import torch
 import hyperparameters as hp
-from model import generate_response
+from pipeline import generate_response
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
-from langchain_community.embeddings import SentenceTransformerEmbeddings
 
 def evaluate_retriever(retriever, eval_dataset_path):
     """

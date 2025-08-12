@@ -21,4 +21,4 @@ RETRIEVAL_K = 5
 SPARSE_RATIO = 0.7
 
 # Path to the document to be loaded and processed
-DOCUMENT_PATH = "./HobbitBook.txt"
+DOCUMENT_PATH = "../data/HobbitBook.txt"

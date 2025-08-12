@@ -3,7 +3,8 @@ import model
 import loader
 import retriever
 import hyperparameters as hp
-from langchain.retrievers import BM25Retriever, EnsembleRetriever
+from langchain.retrievers import EnsembleRetriever
+from langchain_community.retrievers import BM25Retriever
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 def build_rag_pipeline(file_path):

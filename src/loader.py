@@ -1,5 +1,5 @@
 import os
-from langchain.document_loaders import PyPDFLoader, TextLoader
+from langchain_community.document_loaders import PyPDFLoader, TextLoader
 
 def validate_pdf_file(pdf_path):
     """Validate that the file exists and is a PDF."""
