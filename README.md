@@ -59,9 +59,3 @@ RAG-Boilerplate/
 ## 📄 License
 
 MIT License
-
----
-
-**RAG-Boilerplate** is your starting point for building production-ready, research-grade RAG systems. Contributions welcome! 🤗
-
----
