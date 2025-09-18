@@ -7,6 +7,9 @@ MODEL_NAME = "deepseek-r1:8b"
 # For complete list of embedding models, see: https://huggingface.co/spaces/mteb/leaderboard
 EMBEDDING_NAME = 'Qwen/Qwen3-Embedding-0.6B'
 
+# Name of the reranker model for refining search results
+RERANKER_NAME = "Qwen/Qwen3-Reranker-0.6B"
+
 # Size of document chunks for processing
 CHUNK_SIZE = 2500
 
