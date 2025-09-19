@@ -1,0 +1,624 @@
+[
+  {
+    "query": "What was the hobbit's name?",
+    "ground_truth_answer": "The hobbit's name was Baggins.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "This hobbit was a very well-to-do hobbit, and his name was Baggins. "
+      }
+    ],
+    "query_type": "simple"
+  },
+  {
+    "query": "What color was the hobbit's door and what material was its knob?",
+    "ground_truth_answer": "The hobbit's round door was painted green, and it had a shiny yellow brass knob in the exact middle.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "It had a perfectly round door like a porthole, painted green, with a shiny yellow brass knob in the exact middle."
+      }
+    ],
+    "query_type": "multi_hop"
+  },
+  {
+    "query": "Who was Bilbo's mother and what was her family known for?",
+    "ground_truth_answer": "Bilbo's mother was the famous Belladonna Took. The Took family was known for occasionally going on adventures, which made them less respectable than the Bagginses, though they were richer.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "the mother of this hobbit — of Bilbo Baggins, that is — was the famous Belladonna Took "
+      },
+      {
+        "text_snippet": "once in a while members of the Took-clan would go and have adventures. "
+      },
+      {
+        "text_snippet": "the fact remained that the Tooks were not as respectable as the Bagginses, though they were undoubtedly richer. "
+      }
+    ],
+    "query_type": "multi_hop"
+  },
+  {
+    "query": "What was Gandalf seeking when he arrived at Bilbo's hobbit-hole?",
+    "ground_truth_answer": "Gandalf was looking for someone to share in an adventure he was arranging.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "I am looking for someone to share in an adventure that I am arranging, and it's very difficult to find anyone."
+      }
+    ],
+    "query_type": "simple"
+  },
+  {
+    "query": "What did Gandalf scratch on Bilbo's door, and what did it signify?",
+    "ground_truth_answer": "Gandalf scratched a queer sign on the door. The sign was a trade mark that usually meant \"Burglar wants a good job, plenty of Excitement and reasonable Reward\".",
+    "relevant_chunks": [
+      {
+        "text_snippet": "After a while he stepped up, and with the spike on his staff scratched a queer sign on the hobbit's beautiful green front-door."
+      },
+      {
+        "text_snippet": "I assure you there is a mark on this door — the usual one in the trade, or used to be. Burglar wants a good job, plenty of Excitement and reasonable Reward, that's how it is usually read."
+      }
+    ],
+    "query_type": "multi_hop"
+  },
+  {
+    "query": "Who was the first dwarf to arrive at Bilbo's house for the unexpected party?",
+    "ground_truth_answer": "The first dwarf to arrive at Bilbo's house was Dwalin.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "He hung his hooded cloak on the nearest peg, and “Dwalin at your service!” he said with a low bow. "
+      }
+    ],
+    "query_type": "simple"
+  },
+  {
+    "query": "What instruments did the dwarves play at Bilbo's party?",
+    "ground_truth_answer": "The dwarves played little fiddles (Kili and Fili), flutes (Dori, Nori, and Ori), a drum (Bombur), clarinets (Bifur and Bofur), viols (Dwalin and Balin), and a beautiful golden harp (Thorin).",
+    "relevant_chunks": [
+      {
+        "text_snippet": "Kili and Fili rushed for their bags and brought back little fiddles; "
+      },
+      {
+        "text_snippet": "Dori, Nori, and Ori brought out flutes from somewhere inside their coats; Bombur produced a drum from the hall; "
+      },
+      {
+        "text_snippet": "Bifur and Bofur went out too, and came back with clarinets that they had left among the walking-sticks. "
+      },
+      {
+        "text_snippet": "They came back with viols as big as themselves, and with Thorin' s harp wrapped in a green cloth."
+      }
+    ],
+    "query_type": "simple"
+  },
+  {
+    "query": "Who was Bullroarer Took and what game did he invent?",
+    "ground_truth_answer": "Bullroarer Took was a large hobbit ancestor of Bilbo's who could ride a horse. In the Battle of the Green Fields, he knocked the head of the goblin king, Golfimbul, into a rabbit-hole, thereby inventing the game of golf.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "Old Took's great-grand-uncle Bullroarer, who was so huge (for a hobbit) that he could ride a horse."
+      },
+      {
+        "text_snippet": "He charged the ranks of the goblins of Mount Gram in the Battle of the Green Fields, and knocked their king Golfimbul's head clean off with a wooden club."
+      },
+      {
+        "text_snippet": "It sailed a hundred yards through the air and went down a rabbit-hole, and in this way the battle was won and the game of Golf invented at the same moment."
+      }
+    ],
+    "query_type": "multi_hop"
+  },
+  {
+    "query": "What were the business terms offered to Bilbo for his role as burglar?",
+    "ground_truth_answer": "The terms offered to Bilbo were: \"cash on delivery, up to and not exceeding one fourteenth of total profits (if any); all travelling expenses guaranteed in any event; funeral expenses to be defrayed by us or our representatives, if occasion arises\".",
+    "relevant_chunks": [
+      {
+        "text_snippet": "Terms: cash on delivery, up to and not exceeding one fourteenth of total profits (if any); all travelling expenses guaranteed in any event; funeral expenses to be defrayed by us or our representatives, if occasion arises and the matter is not otherwise arranged for. "
+      }
+    ],
+    "query_type": "simple"
+  },
+  {
+    "query": "What were the names of the three trolls that captured the dwarves?",
+    "ground_truth_answer": "The three trolls were named William, Bert, and Tom.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "What the 'ell William was a-thinkin' of to bring us into these parts at all"
+      },
+      {
+        "text_snippet": "You've et a village and a half between yer, since we come down from the mountains."
+      },
+      {
+        "text_snippet": "Bert and Tom went off to the barrel."
+      }
+    ],
+    "query_type": "simple"
+  },
+  {
+    "query": "How did Gandalf defeat the three trolls?",
+    "ground_truth_answer": "Gandalf imitated the trolls' voices, which kept them bickering and quarrelling with each other until the sun came up. Because trolls must be underground before dawn, they turned back into the mountain-stuff they are made of and became stone.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "It was the wizard's voice that had kept the trolls bickering and quarrelling, until the light came and made an end of them."
+      },
+      {
+        "text_snippet": "for trolls, as you probably know, must be underground before dawn, or they go back to the stuff of the mountains they are made of, and never move again. "
+      }
+    ],
+    "query_type": "multi_hop"
+  },
+  {
+    "query": "What were the names of the two famous swords found in the trolls' lair and who originally made them?",
+    "ground_truth_answer": "The swords were named Orcrist (the Goblin-cleaver) and Glamdring (the Foe-hammer). Elrond identified them as ancient swords made in Gondolin by the High Elves of the West for the Goblin-wars.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "This, Thorin, the runes name Orcrist, the Goblin-cleaver in the ancient tongue of Gondolin; it was a famous blade. This, Gandalf, was Glamdring, Foe-hammer that the king of Gondolin once wore."
+      },
+      {
+        "text_snippet": "They are old swords, very old swords of the High Elves of the West, my kin. They were made in Gondolin for the Goblin-wars."
+      }
+    ],
+    "query_type": "multi_hop"
+  },
+  {
+    "query": "What did the moon-letters on Thorin's map reveal?",
+    "ground_truth_answer": "The moon-letters on the map revealed the message: \"Stand by the grey stone when the thrush knocks, and the setting sun with the last light of Durin's Day will shine upon the key-hole\".",
+    "relevant_chunks": [
+      {
+        "text_snippet": "“ Stand by the grey stone when the thrush knocks. ” read Elrond, “and the setting sun with the last light of Durin's Day will shine upon the key-hole.” "
+      }
+    ],
+    "query_type": "simple"
+  },
+  {
+    "query": "What is Durin's Day?",
+    "ground_truth_answer": "According to Thorin, Durin's Day is the first day of the dwarves' New Year, which is the first day of the last moon of Autumn when it and the sun are in the sky together.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "“The first day of the dwarves' New Year,” said Thorin, “is as all should know the first day of the last moon of Autumn on the threshold of Winter. We still call it Durin's Day when the last moon of Autumn and the sun are in the sky together. "
+      }
+    ],
+    "query_type": "simple"
+  },
+  {
+    "query": "What creatures did Bilbo see having a 'thunder-battle' in the Misty Mountains?",
+    "ground_truth_answer": "During the storm, Bilbo saw stone-giants across the valley hurling rocks at one another for a game.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "When he peeped out in the lightning-flashes, he saw that across the valley the stone-giants were out, and were hurling rocks at one another for a game "
+      }
+    ],
+    "query_type": "simple"
+  },
+  {
+    "query": "How did Gandalf escape capture by the goblins?",
+    "ground_truth_answer": "Bilbo's yell woke Gandalf up just as the goblins came to grab him. The wizard produced a terrific flash like lightning that smelled of gunpowder, killing several goblins and allowing him to escape before the crack in the wall closed.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "Bilbo's yell had done that much good. It had wakened him up wide in a splintered second, and when goblins came to grab him, there was a terrific flash like lightning in the cave, a smell like gunpowder, and several of them fell dead."
+      }
+    ],
+    "query_type": "simple"
+  },
+  {
+    "query": "What nicknames did the goblins have for the swords Orcrist and Glamdring?",
+    "ground_truth_answer": "The goblins called Orcrist \"Biter\" and Glamdring \"Beater\".",
+    "relevant_chunks": [
+      {
+        "text_snippet": "They had called it Orcrist, Goblin-cleaver, but the goblins called it simply Biter."
+      },
+      {
+        "text_snippet": "The goblins just called it Beater, and hated it worse than Biter if possible."
+      }
+    ],
+    "query_type": "multi_hop"
+  },
+  {
+    "query": "What did Bilbo find on the floor of the goblin tunnel when he was alone?",
+    "ground_truth_answer": "While crawling along, Bilbo's hand met a tiny ring of cold metal lying on the floor of the tunnel.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "He guessed as well as he could, and crawled along for a good way, till suddenly his hand met what felt like a tiny ring of cold metal lying on the floor of the tunnel."
+      }
+    ],
+    "query_type": "simple"
+  },
+  {
+    "query": "What was the last riddle Bilbo asked Gollum that won him the game?",
+    "ground_truth_answer": "Bilbo, speaking to himself, said aloud, \"What have I got in my pocket?\" Gollum thought it was a riddle and, after three wrong guesses, lost the game.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "“What have I got in my pocket?” he said aloud."
+      },
+      {
+        "text_snippet": "He was talking to himself, but Gollum thought it was a riddle, and he was frightfully upset."
+      },
+      {
+        "text_snippet": "“Wrong,” said Bilbo, who had luckily just taken his hand out again. “Guess again!”"
+      },
+      {
+        "text_snippet": "“Wrong!” said Bilbo, who had lost his some time ago. “Last guess!”"
+      },
+      {
+        "text_snippet": "“String, or nothing!” shrieked Gollum, which was not quite fair — working in two guesses at once."
+      }
+    ],
+    "query_type": "multi_hop"
+  },
+  {
+    "query": "What was the magical property of Gollum's ring?",
+    "ground_truth_answer": "If you slipped the ring on your finger, you became invisible. The only way you could be seen was by your shadow in full sunlight, and even that was shaky and faint.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "He wanted it because it was a ring of power, and if you slipped that ring on your finger, you were invisible; only in the full sunlight could you be seen, and then only by your shadow, and that would be shaky and faint."
+      }
+    ],
+    "query_type": "multi_hop"
+  },
+  {
+    "query": "What name did Bilbo give his sword?",
+    "ground_truth_answer": "After killing the giant spider by himself, Bilbo named his sword \"Sting\".",
+    "relevant_chunks": [
+      {
+        "text_snippet": "“I will give you a name,” he said to it, “and I shall call you Sting.”"
+      }
+    ],
+    "query_type": "simple"
+  },
+  {
+    "query": "What happened to Bombur when he fell into the enchanted stream in Mirkwood?",
+    "ground_truth_answer": "When the dwarves laid him on the bank, Bombur was already fast asleep and remained so, despite their efforts to wake him.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "When they laid him on the bank he was already fast asleep, with one hand clutching the rope so tight that they could not get it from his grasp;"
+      },
+      {
+        "text_snippet": "and fast asleep he remained in spite of all they could do."
+      }
+    ],
+    "query_type": "simple"
+  },
+  {
+    "query": "How did Bilbo and the dwarves escape the Elvenking's halls?",
+    "ground_truth_answer": "Bilbo freed the dwarves from their cells and packed them into empty barrels. The barrels were then dropped through a trapdoor into an underground stream that flowed out of the caves.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "First he unlocked Balin' s door, and locked it again carefully as soon as the dwarf was outside."
+      },
+      {
+        "text_snippet": "They soon found thirteen with room enough for a dwarf in each."
+      },
+      {
+        "text_snippet": "When the barrels were empty the elves cast them through the trapdoors, opened the water-gate, and out the barrels floated on the stream."
+      },
+      {
+        "text_snippet": "So they sang as first one barrel and then another rumbled to the dark opening and was pushed over into the cold water some feet below."
+      }
+    ],
+    "query_type": "multi_hop"
+  },
+  {
+    "query": "Who is Beorn and what can he do?",
+    "ground_truth_answer": "Beorn is a very strong man who lives in an oak-wood. He is a skin-changer, meaning he can change his shape from a great strong man to a huge black bear.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "If you must know more, his name is Beorn. He is very strong, and he is a skin-changer."
+      },
+      {
+        "text_snippet": "He lives in an oak-wood and has a great wooden house;"
+      },
+      {
+        "text_snippet": "He changes his skin: sometimes he is a huge black bear, sometimes he is a great strong black-haired man with huge arms and a great beard."
+      }
+    ],
+    "query_type": "multi_hop"
+  },
+  {
+    "query": "What were Beorn's two key warnings about Mirkwood?",
+    "ground_truth_answer": "Beorn's key warnings about Mirkwood were to neither drink from nor bathe in the black enchanted stream, and that they must not stray from the path for any reason.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "There is one stream there, I know, black and strong which crosses the path. That you should neither drink of, nor bathe in; for I have heard that it carries enchantment and a great drowsiness and forgetfulness."
+      },
+      {
+        "text_snippet": "And in the dim shadows of that place I don't think you will shoot anything, wholesome or unwholesome, without straying from the path. That you MUST NOT do, for any reason."
+      }
+    ],
+    "query_type": "multi_hop"
+  },
+  {
+    "query": "What was Gandalf's final warning to the company before they entered Mirkwood?",
+    "ground_truth_answer": "As he rode away, Gandalf's final warning was, \"Good-bye! Be good, take care of yourselves — and DON'T LEAVE THE PATH!\".",
+    "relevant_chunks": [
+      {
+        "text_snippet": "They heard his voice come faintly: “Good-bye! Be good, take care of yourselves — and DON'T LEAVE THE PATH!”."
+      }
+    ],
+    "query_type": "simple"
+  },
+  {
+    "query": "What was the first item Bilbo stole from Smaug's treasure hoard?",
+    "ground_truth_answer": "The first item of treasure Bilbo stole from Smaug was a great two-handled cup.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "He grasped a great two-handled cup, as heavy as he could carry, and cast one fearful eye upwards."
+      }
+    ],
+    "query_type": "simple"
+  },
+  {
+    "query": "What was the flaw in Smaug's diamond armor?",
+    "ground_truth_answer": "Bilbo discovered that there was a large patch in the hollow of Smaug's left breast that was bare, like a snail out of its shell.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "Why, there is a large patch in the hollow of his left breast as bare as a snail out of its shell!"
+      }
+    ],
+    "query_type": "simple"
+  },
+  {
+    "query": "How did Bard learn about Smaug's weak spot?",
+    "ground_truth_answer": "An old thrush flew to Bard's shoulder and told him about what it had heard up on the Mountain, advising him to \"Look for the hollow of the left breast as he flies and turns above you!\".",
+    "relevant_chunks": [
+      {
+        "text_snippet": "“Wait! Wait!” it said to him. “The moon is rising. Look for the hollow of the left breast as he flies and turns above you!” "
+      },
+      {
+        "text_snippet": "And while Bard paused in wonder it told him of tidings up in the Mountain and of all that it had heard."
+      }
+    ],
+    "query_type": "multi_hop"
+  },
+  {
+    "query": "Who was Roac, and what two pieces of news did he bring?",
+    "ground_truth_answer": "Roac was the son of Carc and the chief of the great ravens of the Mountain. He brought news that Smaug was dead, but also warned that a host of elves and men from the lake were approaching, eager for a share of the treasure.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "I am Roac son of Care."
+      },
+      {
+        "text_snippet": "Now I am the chief of the great ravens of the Mountain. "
+      },
+      {
+        "text_snippet": "Behold! the birds are gathering back again to the Mountain and to Dale from South and East and West, for word has gone out that Smaug is dead!"
+      },
+      {
+        "text_snippet": "Already a host of the elves is on the way...By the lake men murmur that their sorrows are due to the dwarves...They too think to find amends from your treasure."
+      }
+    ],
+    "query_type": "multi_hop"
+  },
+  {
+    "query": "Who did the raven Roac tell Thorin to trust instead of the Master of Lake-town?",
+    "ground_truth_answer": "Roac advised Thorin, \"you will not trust the Master of the Lake-men, but rather him that shot the dragon with his bow. Bard is he, of the race of Dale\".",
+    "relevant_chunks": [
+      {
+        "text_snippet": "If you will listen to my counsel, you will not trust the Master of the Lake-men, but rather him that shot the dragon with his bow."
+      },
+      {
+        "text_snippet": "Bard is he, of the race of Dale, of the line of Girion; he is a grim man but true."
+      }
+    ],
+    "query_type": "multi_hop"
+  },
+  {
+    "query": "Why did Bilbo give the Arkenstone to Bard and the Elvenking?",
+    "ground_truth_answer": "Bilbo gave them the Arkenstone, which he called \"the heart of Thorin,\" stating that it would aid them in their bargaining with the dwarf king.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "“This is the Arkenstone of Thrain,” said Bilbo, “the Heart of the Mountain; and it is also the heart of Thorin. He values it above a river of gold. I give it to you. It will aid you in your bargaining.”"
+      }
+    ],
+    "query_type": "simple"
+  },
+  {
+    "query": "Who was Dain and how many dwarves did he bring to the Lonely Mountain?",
+    "ground_truth_answer": "Dain was Thorin's cousin from the Iron Hills. He brought more than five hundred dwarves with him.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "But go specially to my cousin Dain in the Iron Hills, for he has many people well-armed, and dwells nearest to this place."
+      },
+      {
+        "text_snippet": "Dain and more than five hundred dwarves, hurrying from the Iron Hills, were now within about two days' march of Dale."
+      }
+    ],
+    "query_type": "multi_hop"
+  },
+  {
+    "query": "What was the battle before the gates of the Lonely Mountain called?",
+    "ground_truth_answer": "The unexpected conflict was called the Battle of Five Armies.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "So began a battle that none had expected; and it was called the Battle of Five Armies, and it was very terrible."
+      }
+    ],
+    "query_type": "simple"
+  },
+  {
+    "query": "Which groups fought in the Battle of Five Armies?",
+    "ground_truth_answer": "The battle was fought between the Goblins and the Wild Wolves on one side, and the Elves, Men, and Dwarves on the other.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "Upon one side were the Goblins and the Wild Wolves, and upon the other were Elves and Men and Dwarves."
+      }
+    ],
+    "query_type": "simple"
+  },
+  {
+    "query": "Who were the two unexpected arrivals that helped turn the tide of the battle?",
+    "ground_truth_answer": "The Eagles arrived first, driving the goblins from the mountain slopes. Then, Beorn appeared in his bear form, breaking through the enemy ranks and crushing the goblin leader, Bolg.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "“The Eagles! The Eagles!” he shouted. “The Eagles are coming!”"
+      },
+      {
+        "text_snippet": "They it was who dislodged the goblins from the mountain-slopes, casting them over precipices."
+      },
+      {
+        "text_snippet": "In that last hour Beorn himself had appeared — no one knew how or from where."
+      },
+      {
+        "text_snippet": "He scattered the bodyguard, and pulled down Bolg himself and crushed him."
+      }
+    ],
+    "query_type": "multi_hop"
+  },
+  {
+    "query": "What were Thorin Oakenshield's final words to Bilbo?",
+    "ground_truth_answer": "Thorin's last words were: \"If more of us valued food and cheer and song above hoarded gold, it would be a merrier world. But sad or merry, I must leave it now. Farewell!\".",
+    "relevant_chunks": [
+      {
+        "text_snippet": "If more of us valued food and cheer and song above hoarded gold, it would be a merrier world. But sad or merry, I must leave it now. Farewell!"
+      }
+    ],
+    "query_type": "simple"
+  },
+  {
+    "query": "What became of Thorin, Fili, and Kili?",
+    "ground_truth_answer": "Thorin was mortally wounded in the battle and was buried deep beneath the Mountain with the Arkenstone on his breast. Fili and Kili had fallen while defending him.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "There indeed lay Thorin Oakenshield, wounded with many wounds."
+      },
+      {
+        "text_snippet": "They buried Thorin deep beneath the Mountain, and Bard laid the Arkenstone upon his breast."
+      },
+      {
+        "text_snippet": "Fili and Kili had fallen defending him with shield and body, for he was their mother's elder brother."
+      }
+    ],
+    "query_type": "multi_hop"
+  },
+  {
+    "query": "Who became the new King under the Mountain?",
+    "ground_truth_answer": "Dain son of Nain became the new King under the Mountain.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "There now Dain son of Nain took up his abode, and he became King under the Mountain, and in time many other dwarves gathered to his throne in the ancient halls."
+      }
+    ],
+    "query_type": "simple"
+  },
+  {
+    "query": "How much of the treasure did Bilbo take home?",
+    "ground_truth_answer": "Bilbo would only accept two small chests, one filled with silver and the other with gold, which was as much as a single strong pony could carry.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "In the end he would only take two small chests, one filled with silver, and the other with gold, such as one strong pony could carry."
+      }
+    ],
+    "query_type": "simple"
+  },
+  {
+    "query": "Where had Gandalf been during the events in Mirkwood?",
+    "ground_truth_answer": "Gandalf had been at a great council of white wizards, and they had successfully driven the Necromancer from his fortress in the south of Mirkwood.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "It appeared that Gandalf had been to a great council of the white wizards, masters of lore and good magic;"
+      },
+      {
+        "text_snippet": "and that they had at last driven the Necromancer from his dark hold in the south of Mirkwood."
+      }
+    ],
+    "query_type": "multi_hop"
+  },
+  {
+    "query": "What was happening at Bag-End when Bilbo finally returned home?",
+    "ground_truth_answer": "When Bilbo returned home, he found an auction in progress. His belongings were being sold off because he had been presumed dead.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "He had arrived back in the middle of an auction!"
+      },
+      {
+        "text_snippet": "In short Bilbo was “Presumed Dead”, and not everybody that said so was sorry to find the presumption wrong."
+      }
+    ],
+    "query_type": "multi_hop"
+  },
+  {
+    "query": "What did Bilbo name the book he was writing about his adventures?",
+    "ground_truth_answer": "Bilbo thought of calling his memoirs \"There and Back Again, a Hobbit's Holiday\".",
+    "relevant_chunks": [
+      {
+        "text_snippet": "he thought of calling them “There and Back Again, a Hobbit's Holiday”."
+      }
+    ],
+    "query_type": "simple"
+  },
+  {
+    "query": "What happened to the old Master of Lake-town?",
+    "ground_truth_answer": "The old Master of Lake-town fell under the \"dragon-sickness,\" took most of the gold, fled with it, and eventually died of starvation in the Waste, deserted by his companions.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "The old Master had come to a bad end. Bard had given him much gold for the help of the Lake- people, but being of the kind that easily catches such disease he fell under the dragon-sickness, and took most of the gold and fled with it, and died of starvation in the Waste, deserted by his companions."
+      }
+    ],
+    "query_type": "simple"
+  },
+  {
+    "query": "What became of the trolls' gold that was buried near the road?",
+    "ground_truth_answer": "On their return journey, Gandalf and Bilbo found the trolls' gold still hidden and untouched.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "Not far from the road they found the gold of the trolls, which they had buried, still hidden and untouched."
+      }
+    ],
+    "query_type": "simple"
+  },
+  {
+    "query": "What parting gift did Bilbo give to the Elvenking?",
+    "ground_truth_answer": "Bilbo gave the Elvenking a necklace of silver and pearls, which Dain had originally given to Bilbo, as a return for his hospitality.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "“I beg of you,” said Bilbo stammering and standing on one foot, “to accept this gift!”"
+      },
+      {
+        "text_snippet": "and he brought out a necklace of silver and pearls that Dain had given him at their parting."
+      },
+      {
+        "text_snippet": "I have drunk much of your wine and eaten much of your bread."
+      }
+    ],
+    "query_type": "multi_hop"
+  },
+  {
+    "query": "What was the coat of mail Thorin gave Bilbo made of?",
+    "ground_truth_answer": "Thorin gave Bilbo a small coat of mail wrought for an elf-prince, made of silver-steel, which the elves call mithril.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "With that he put on Bilbo a small coat of mail, wrought for some young elf-prince long ago."
+      },
+      {
+        "text_snippet": "It was of silver-steel, which the elves call mithril, and with it went a belt of pearls and crystals."
+      }
+    ],
+    "query_type": "multi_hop"
+  },
+  {
+    "query": "What was the Arkenstone?",
+    "ground_truth_answer": "The Arkenstone was a great white gem, also known as the Heart of the Mountain, which the dwarves had found beneath the roots of the Mountain long ago. It shone with its own inner light and was prized by Thorin above all other treasure.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "But fairest of all was the great white gem, which the dwarves had found beneath the roots of the Mountain, the Heart of the Mountain, the Arkenstone of Thrain."
+      },
+      {
+        "text_snippet": "The great jewel shone before his feet of its own inner light."
+      },
+      {
+        "text_snippet": "He values it above a river of gold."
+      }
+    ],
+    "query_type": "multi_hop"
+  },
+  {
+    "query": "How many of the thirteen dwarves survived the quest?",
+    "ground_truth_answer": "Ten of the twelve companions of Thorin survived the quest. Thorin himself also died, bringing the total number of surviving dwarves from the original company to ten.",
+    "relevant_chunks": [
+      {
+        "text_snippet": "Of the twelve companions of Thorin, ten remained. Fili and Kili had fallen defending him with shield and body, for he was their mother's elder brother."
+      },
+      {
+        "text_snippet": "There indeed lay Thorin Oakenshield, wounded with many wounds."
+      },
+      {
+        "text_snippet": "“I go now to the halls of waiting to sit beside my fathers, until the world is renewed."
+      }
+    ],
+    "query_type": "multi_hop"
+  }
+]

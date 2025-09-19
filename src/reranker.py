@@ -7,6 +7,7 @@ from typing import List, Dict, Tuple, Union, Sequence, Optional
 class RAGReranker:
     def __init__(self, model_name: str = hp.RERANKER_NAME):
         """Initialize the reranker with model loading done once"""
+
         self.model_name = model_name
         self.tokenizer: AutoTokenizer = AutoTokenizer.from_pretrained(model_name, padding_side='left')
         self.model = AutoModelForCausalLM.from_pretrained(
@@ -42,13 +43,13 @@ class RAGReranker:
         
         return device
 
-    def format_instruction(self, instruction: Optional[str], query: str, doc_content: str) -> str:
+    def _format_instruction(self, instruction: Optional[str], query: str, doc_content: str) -> str:
         """Format the instruction for the reranker"""
         if instruction is None:
             instruction = 'Given a web search query, retrieve relevant passages that answer the query'
         return f"<Instruct>: {instruction}\n<Query>: {query}\n<Document>: {doc_content}"
 
-    def process_inputs(self, pairs: Sequence[str]) -> Dict[str, torch.Tensor]:
+    def _process_inputs(self, pairs: Sequence[str]) -> Dict[str, torch.Tensor]:
         """Process and tokenize input pairs"""
         inputs = self.tokenizer(
             pairs,
@@ -71,7 +72,7 @@ class RAGReranker:
 
         return inputs
 
-    def compute_logits(self, inputs: Dict[str, torch.Tensor]) -> List[float]:
+    def _compute_logits(self, inputs: Dict[str, torch.Tensor]) -> List[float]:
         """Compute relevance scores from model logits"""
         with torch.no_grad():
             batch_scores = self.model(**inputs).logits[:, -1, :]
@@ -119,12 +120,12 @@ class RAGReranker:
 
         # Create instruction pairs - query is repeated for each document
         task = instruction or 'Given a user query, retrieve relevant passages that answer the query'
-        pairs = [self.format_instruction(task, query, doc_content)
+        pairs = [self._format_instruction(task, query, doc_content)
                 for doc_content in doc_contents]
 
         # Process inputs and compute scores
-        inputs = self.process_inputs(pairs)
-        scores = self.compute_logits(inputs)
+        inputs = self._process_inputs(pairs)
+        scores = self._compute_logits(inputs)
 
         # Sort by scores and apply top_k filtering
         doc_score_pairs = list(zip(docs, scores))

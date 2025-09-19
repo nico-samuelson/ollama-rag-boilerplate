@@ -1,227 +1,256 @@
 import time
-import model
-import loader
-import retriever
+import traceback
+from model import OllamaLLM
 import hyperparameters as hp
-from langchain.retrievers import EnsembleRetriever
-from langchain_community.retrievers import BM25Retriever
+from typing import List, Tuple
+from reranker import RAGReranker
+from loader import DocumentLoader
+from langchain.schema import Document
+from retriever import HybridRetriever
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-def build_rag_pipeline(file_path):
-    # Load documents
-    print("Loading documents...")
-    documents = loader.load_document(file_path)
+class RAGPipeline:
+    def __init__(self,
+                 file_path: str,
+                 chunk_size: int = hp.CHUNK_SIZE,
+                 chunk_overlap: int = hp.CHUNK_OVERLAP,
+                 reranker_name: str = hp.RERANKER_NAME,
+                 model_name: str = hp.MODEL_NAME,
+                 temperature: float = 0.5,
+                 max_new_tokens: int = 1024,
+    ):
+        self.file_path = file_path
+        self.chunks = []
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
+        self.reranker_name = reranker_name
+        self.model_name = model_name
+        self.temperature = temperature
+        self.max_new_tokens = max_new_tokens
 
-    # Preprocess text
-    documents = loader.preprocess_document(documents)
+        self.loader = DocumentLoader(self.file_path)
+        self.retriever = HybridRetriever(self.chunks)
+        self.reranker = RAGReranker(self.reranker_name)
+        self.llm = OllamaLLM(
+            model=self.model_name,
+            temperature=self.temperature,
+            max_new_tokens=self.max_new_tokens,
+        )
 
-    # Split documents into chunks
-    print("Splitting documents into chunks...")
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=hp.CHUNK_SIZE,
-        chunk_overlap=hp.CHUNK_OVERLAP,
-        separators=["\n\n", "\n", " ", ""]
-    )
-    chunks = text_splitter.split_documents(documents)
-    print(f"Split into {len(chunks)} chunks.")
+        self.load_and_preprocess_document()
 
-    # Filter out very small chunks (likely artifacts)
-    chunks = [chunk for chunk in chunks if len(chunk.page_content.strip()) > 100]
-    print(f"After filtering: {len(chunks)} chunks remain.")
+    def load_and_preprocess_document(self):
+        """Load and preprocess the document from file path."""
 
-    # Setup retrievers with smaller chunk sizes to avoid context overflow
-    print("Setting up retrievers...")
-    dense_retriever = retriever.setup_gpu_embeddings(chunks)
-    sparse_retriever = BM25Retriever.from_documents(chunks)
-    sparse_retriever.k = hp.RETRIEVAL_K
+        document = self.loader.load_document(self.file_path)
+        document = self.loader.preprocess_document(document)
+        self.split_document(document)
 
-    hybrid_retriever = EnsembleRetriever(
-        retrievers=[sparse_retriever, dense_retriever],
-        weights=[hp.SPARSE_RATIO, 1-hp.SPARSE_RATIO]
-    )
+    def split_document(self, document: List[Document]):
+        """Split the document into chunks."""
 
-    # Try Ollama LLM setup
-    print("\nSetting up Ollama LLM...")
-    llm = model.setup_ollama_llm()
+        # Split documents into chunks
+        print("Splitting documents into chunks...")
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=self.chunk_size,
+            chunk_overlap=self.chunk_overlap,
+            separators=["\n\n", "\n", " ", ""]
+        )
+        chunks = text_splitter.split_documents(document)
+        print(f"Split into {len(chunks)} chunks.")
 
-    if llm is None:
-        raise RuntimeError("No LLM could be initialized.")
+        # Filter out very small chunks (likely artifacts)
+        self.chunks = [chunk for chunk in chunks if len(chunk.page_content.strip()) > 100]
+        print(f"After filtering: {len(self.chunks)} chunks remain.")
 
-    return hybrid_retriever, llm
+    def format_docs(self, docs: List[Document]) -> str:
+        """Convert list of documents into a single string for prompt context."""
+        
+        formatted = []
+        total_chars = 0
 
-def format_docs(docs):
-    formatted = []
-    total_chars = 0
+        for i, doc in enumerate(docs):
+            source_info = ""
+            if hasattr(doc, 'metadata') and doc.metadata:
+                page = doc.metadata.get('page', 'Unknown')
+                source_info = f" (Page {page})"
 
-    for i, doc in enumerate(docs):
-        source_info = ""
-        if hasattr(doc, 'metadata') and doc.metadata:
-            page = doc.metadata.get('page', 'Unknown')
-            source_info = f" (Page {page})"
+            # Format the document
+            doc_text = f"Source {i+1}{source_info}:\n{doc.page_content}"
 
-        # Format the document
-        doc_text = f"Source {i+1}{source_info}:\n{doc.page_content}"
+            formatted.append(doc_text)
+            total_chars += len(doc_text) + 2
 
-        formatted.append(doc_text)
-        total_chars += len(doc_text) + 2
+        result = "\n\n".join(formatted)
+        print(f"\nContext length: ~{len(result)} characters")
+        return result
 
-    result = "\n\n".join(formatted)
-    print(f"\nContext length: ~{len(result)} characters")
-    return result
+    def retrieve_relevant_docs(self, query: str) -> Tuple[List[Document], Tuple[List[Document], List[float]]]:
+        """
+        Retrieve and rerank documents based on the query.
 
-def generate_response_with_progress(query, retriever, llm):
-    print(f"\nProcessing query: '{query}'")
+        Args:
+            query (str): The user query.
+        Returns:
+            tuple: (list of retrieved documents, list of reranked documents)
+        """
 
-    start_time = time.time()
+        print("📚 Retrieving relevant documents...", end='', flush=True)
+        retrieved_docs = self.retriever.as_retriever().invoke(query)
+        print(f" Found {len(retrieved_docs)} documents")
 
-    print("📚 Retrieving relevant documents...", end='', flush=True)
-    retrieved_docs = retriever.invoke(query)
-    print(f" Found {len(retrieved_docs)} documents")
+        print("📚 Reranking documents...", end='', flush=True)
+        reranked_docs = self.reranker.rerank(query, retrieved_docs, 5)
+        print("Selected top 10 documents")
 
-    print("Preparing context...", end='', flush=True)
-    context = format_docs(retrieved_docs)
-    print(" Context ready")
+        return retrieved_docs, reranked_docs
 
-    # Prompt template
-    formatted_prompt = f"""You are an assistant for question-answering tasks.
-Use the following pieces of retrieved context to answer the question.
-If you don't know the answer, just say that you don't know.
+    def prepare_prompt(self, query: str, docs: List[str]) -> str:
+        """Inject the prompt with context and user query."""
 
-Context:
-{context}
+        print("Preparing context...", end='', flush=True)
+        context = self.format_docs(docs)
+        print(" Context ready")
 
-Question: {query}
+        # Prompt template
+        formatted_prompt = f"""You are an assistant for question-answering tasks.
+        Use the following pieces of retrieved context to answer the question. Don't say according to source 1, passage 1, etc. in your answer.
+        If you don't know the answer, just say that you don't know.
 
-Answer:"""
+        Context:
+        {context}
 
-    print("\n" + "="*50)
-    print("AI RESPONSE (Streaming)")
-    print("="*50)
+        Question: {query}"""
 
-    full_response = ""
-    word_count = 0
+        return formatted_prompt
 
-    try:
-        for i, token in enumerate(llm.generate_stream(formatted_prompt)):
-            if i == 0:
-                print("\rThinking...  \n", end='', flush=True)
-            print(token, end='', flush=True)
-            full_response += token
+    def generate_response_with_progress(self, query: str) -> Tuple[str, List[Document]]:
+        """
+        Generate response with real-time streaming output.
+        
+        Args:
+            query (str): The user query.
+        Returns:
+            tuple: (response string, list of source documents)
+        """
 
-            # Count words for progress
-            if token.strip():
-                word_count += len(token.split())
+        print(f"\nProcessing query: '{query}'")
 
-        print(f"\n\n📊 Generated {word_count} words")
+        _, reranked_docs = self.retrieve_relevant_docs(query)
+        prompt = self.prepare_prompt(query, reranked_docs[0])
+        start_time = time.time()
 
-    except Exception as e:
-        print(f"\nStreaming error: {e}")
-        print("Falling back to standard generation...")
+        print("\n" + "="*50)
+        print("AI RESPONSE (Streaming)")
+        print("="*50)
 
-        # Fallback to non-streaming call
-        full_response = llm._call(formatted_prompt)
+        full_response = ""
+
+        try:
+            for i, token in enumerate(self.llm.generate_stream(prompt)):
+                if i == 0:
+                    print("\rThinking...  \n", end='', flush=True)
+                print(token, end='', flush=True)
+                full_response += token
+        except Exception as e:
+            print(f"\nStreaming error: {e}")
+            print("Falling back to standard generation...")
+
+            # Fallback to non-streaming call
+            full_response = self.llm._call(prompt)
+            print(full_response)
+
+        total_time = time.time() - start_time
+        print(f"\n\Total time: {total_time:.2f}s")
+
+        return full_response, reranked_docs[0]
+
+    def generate_response(self, query: str) -> Tuple[str, List[Document]]:
+        """
+        Generate response in standard (non-streaming) mode.
+        
+        Args:
+            query (str): The user query.
+        Returns:
+            tuple: (response string, list of source documents)
+        """
+
+        print(f"\nProcessing query: '{query}'")
+
+        _, reranked_docs = self.retrieve_relevant_docs(query)
+        prompt = self.prepare_prompt(query, reranked_docs[0])
+        start_time = time.time()
+
+        print("\n" + "="*50)
+        print("ANSWER (NON-STREAMING)")
+        print("="*50)
+
+        full_response = self.llm._call(prompt)
         print(full_response)
 
-    total_time = time.time() - start_time
-    print(f"Total time: {total_time:.2f}s")
+        total_time = time.time() - start_time
+        print(f"\n\Total time: {total_time:.2f}s")
 
-    return full_response, retrieved_docs
+        return full_response, reranked_docs[0]
 
-def generate_response(query, retriever, llm):
-    print(f"\nProcessing query: '{query}'")
-    print("Retrieving relevant documents...")
+    def interactive_streaming_loop(self):
+        """Interactive loop for user queries with streaming output."""
 
-    start_time = time.time()
+        print(f"\nRAG Pipeline ready")
+        print("📚 Document successfully processed and indexed!")
+        print("\nCommands:")
+        print("  'quit' - Exit the program")
+        print("  'sources' - Toggle source document display")
+        print("  'stream' - Toggle between streaming/standard mode")
 
-    retrieved_docs = retriever.invoke(query)
-    retrieval_time = time.time() - start_time
-    print(f"Retrieved {len(retrieved_docs)} documents in {retrieval_time:.2f}s")
+        show_sources = True
+        use_streaming = True
 
-    context = format_docs(retrieved_docs)
+        while True:
+            try:
+                print("\n" + "="*100)
+                user_query = input(f"Enter your query: ")
 
-    formatted_prompt = f"""You are an assistant for question-answering tasks.
-Use the following pieces of retrieved context to answer the question.
-If you don't know the answer, just say that you don't know.
+                if user_query.lower() == 'quit':
+                    break
+                elif user_query.lower() == 'sources':
+                    show_sources = not show_sources
+                    print(f"Source documents {'enabled' if show_sources else 'disabled'}")
+                    continue
+                elif user_query.lower() == 'stream':
+                    use_streaming = not use_streaming
+                    print(f"Switched to {'streaming' if use_streaming else 'standard'} mode")
+                    continue
+                elif user_query.strip() == '':
+                    continue
 
-Context:
-{context}
+                # Generate response based on mode
+                if use_streaming:
+                    _, source_docs = self.generate_response_with_progress(user_query)
+                else:
+                    _, source_docs = self.generate_response(user_query)
 
-Question: {query}
+                # Show sources if enabled
+                if show_sources:
+                    print("\n" + "="*50)
+                    print(f"📚 SOURCE DOCUMENTS ({len(source_docs)} retrieved)")
+                    print("="*50)
+                    for i, doc in enumerate(source_docs):
+                        page_info = ""
+                        if hasattr(doc, 'metadata') and doc.metadata:
+                            page = doc.metadata.get('page', 'Unknown')
+                            page_info = f" (Page {page})"
 
-You must give your final answer using 'Final Answer:' prefix"""
+                        print(f"\n📄 Source {i+1}{page_info}")
+                        print("-" * 30)
+                        content = doc.page_content[:200] + "..." if len(doc.page_content) > 200 else doc.page_content
+                        print(content)
+                        print("-" * 30)
 
-    print("\n" + "="*50)
-    print("ANSWER (NON-STREAMING)")
-    print("="*50)
-
-    # Use the non-streaming _call method for fallback or non-streaming mode
-    full_response = llm._call(formatted_prompt)
-    print(full_response)
-
-    generation_time = time.time() - start_time - retrieval_time
-    total_time = time.time() - start_time
-
-    print(f"\n\nGeneration time: {generation_time:.2f}s")
-    print(f"Total time: {total_time:.2f}s")
-
-    return full_response, retrieved_docs
-
-def interactive_streaming_loop(retriever, llm):
-    print(f"\nRAG Pipeline ready")
-    print("📚 Document successfully processed and indexed!")
-    print("\nCommands:")
-    print("  'quit' - Exit the program")
-    print("  'sources' - Toggle source document display")
-    print("  'stream' - Toggle between streaming/standard mode")
-
-    show_sources = True
-    use_streaming = True
-
-    while True:
-        try:
-            user_query = input(f"\nEnter your query: ")
-
-            if user_query.lower() == 'quit':
+            except KeyboardInterrupt:
+                print("\n\nInterrupted by user")
                 break
-            elif user_query.lower() == 'sources':
-                show_sources = not show_sources
-                print(f"Source documents {'enabled' if show_sources else 'disabled'}")
-                continue
-            elif user_query.lower() == 'stream':
-                use_streaming = not use_streaming
-                print(f"Switched to {'streaming' if use_streaming else 'standard'} mode")
-                continue
-            elif user_query.strip() == '':
-                continue
-
-            # Generate response based on mode
-            if use_streaming:
-                _, source_docs = generate_response_with_progress(user_query, retriever, llm)
-            else:
-                _, source_docs = generate_response(user_query, retriever, llm)
-
-            # Show sources if enabled
-            if show_sources:
-                print("\n" + "="*50)
-                print(f"📚 SOURCE DOCUMENTS ({len(source_docs)} retrieved)")
-                print("="*50)
-                for i, doc in enumerate(source_docs):
-                    page_info = ""
-                    if hasattr(doc, 'metadata') and doc.metadata:
-                        page = doc.metadata.get('page', 'Unknown')
-                        page_info = f" (Page {page})"
-
-                    print(f"\n📄 Source {i+1}{page_info}")
-                    print("-" * 30)
-                    content = doc.page_content[:200] + "..." if len(doc.page_content) > 200 else doc.page_content
-                    print(content)
-                    print("-" * 30)
-
-        except KeyboardInterrupt:
-            print("\n\nInterrupted by user")
-            break
-        except Exception as e:
-            print(f"\nError: {e}")
-            import traceback
-            traceback.print_exc()
-            print("Please try again or type 'quit' to exit.")
+            except Exception as e:
+                print(f"\nError: {e}")
+                traceback.print_exc()
+                print("Please try again or type 'quit' to exit.")
