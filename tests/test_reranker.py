@@ -78,7 +78,7 @@ class TestRAGReranker:
         query = "test query"
         doc_content = "test document content"
         
-        result = reranker.format_instruction(instruction, query, doc_content)
+        result = reranker._format_instruction(instruction, query, doc_content)
         
         expected = f"<Instruct>: {instruction}\n<Query>: {query}\n<Document>: {doc_content}"
         assert result == expected
@@ -88,7 +88,7 @@ class TestRAGReranker:
         query = "test query"
         doc_content = "test document content"
         
-        result = reranker.format_instruction(None, query, doc_content)
+        result = reranker._format_instruction(None, query, doc_content)
         
         expected = f"<Instruct>: Given a web search query, retrieve relevant passages that answer the query\n<Query>: {query}\n<Document>: {doc_content}"
         assert result == expected
@@ -103,7 +103,7 @@ class TestRAGReranker:
             'attention_mask': [[1, 1, 1], [1, 1, 1]]
         }
         
-        result = reranker.process_inputs(pairs)
+        result = reranker._process_inputs(pairs)
         
         # Check that tokenizer was called correctly
         reranker.tokenizer.assert_called_once_with(
@@ -134,7 +134,7 @@ class TestRAGReranker:
         mock_output.logits = logits
         reranker.model.return_value = mock_output
         
-        scores = reranker.compute_logits(inputs)
+        scores = reranker._compute_logits(inputs)
         
         # Check that model was called
         reranker.model.assert_called_once_with(**inputs)
@@ -160,8 +160,8 @@ class TestRAGReranker:
         docs = ["doc 1 content", "doc 2 content"]
         
         # Mock the methods that will be called
-        with patch.object(reranker, 'process_inputs') as mock_process, \
-             patch.object(reranker, 'compute_logits') as mock_compute:
+        with patch.object(reranker, '_process_inputs') as mock_process, \
+             patch.object(reranker, '_compute_logits') as mock_compute:
             
             mock_process.return_value = {'input_ids': torch.tensor([[1, 2, 3]])}
             mock_compute.return_value = [0.8, 0.6]
@@ -186,8 +186,8 @@ class TestRAGReranker:
             Document(page_content="doc 2 content", metadata={"source": "source2"})
         ]
         
-        with patch.object(reranker, 'process_inputs') as mock_process, \
-             patch.object(reranker, 'compute_logits') as mock_compute:
+        with patch.object(reranker, '_process_inputs') as mock_process, \
+             patch.object(reranker, '_compute_logits') as mock_compute:
             
             mock_process.return_value = {'input_ids': torch.tensor([[1, 2, 3]])}
             mock_compute.return_value = [0.9, 0.7]
@@ -196,9 +196,9 @@ class TestRAGReranker:
             
             # Check that document content was extracted correctly
             expected_pairs = [
-                reranker.format_instruction('Given a user query, retrieve relevant passages that answer the query', 
+                reranker._format_instruction('Given a user query, retrieve relevant passages that answer the query', 
                                           query, "doc 1 content"),
-                reranker.format_instruction('Given a user query, retrieve relevant passages that answer the query', 
+                reranker._format_instruction('Given a user query, retrieve relevant passages that answer the query', 
                                           query, "doc 2 content")
             ]
             
@@ -225,8 +225,8 @@ class TestRAGReranker:
             "string document"
         ]
         
-        with patch.object(reranker, 'process_inputs') as mock_process, \
-             patch.object(reranker, 'compute_logits') as mock_compute:
+        with patch.object(reranker, '_process_inputs') as mock_process, \
+             patch.object(reranker, '_compute_logits') as mock_compute:
             
             mock_process.return_value = {'input_ids': torch.tensor([[1, 2, 3]])}
             mock_compute.return_value = [0.9, 0.8, 0.7, 0.6]
@@ -242,10 +242,10 @@ class TestRAGReranker:
         query = "test query"
         docs = ["doc 1", "doc 2", "doc 3", "doc 4"]
         top_k = 2
-        
-        with patch.object(reranker, 'process_inputs') as mock_process, \
-             patch.object(reranker, 'compute_logits') as mock_compute:
-            
+
+        with patch.object(reranker, '_process_inputs') as mock_process, \
+             patch.object(reranker, '_compute_logits') as mock_compute:
+
             mock_process.return_value = {'input_ids': torch.tensor([[1, 2, 3]])}
             mock_compute.return_value = [0.5, 0.9, 0.3, 0.7]  # Second doc should be first, fourth second
             
@@ -262,10 +262,10 @@ class TestRAGReranker:
         query = "test query"
         docs = ["doc 1"]
         custom_instruction = "Custom reranking instruction"
-        
-        with patch.object(reranker, 'process_inputs') as mock_process, \
-             patch.object(reranker, 'compute_logits') as mock_compute:
-            
+
+        with patch.object(reranker, '_process_inputs') as mock_process, \
+             patch.object(reranker, '_compute_logits') as mock_compute:
+
             mock_process.return_value = {'input_ids': torch.tensor([[1, 2, 3]])}
             mock_compute.return_value = [0.8]
             
@@ -279,10 +279,10 @@ class TestRAGReranker:
         """Test that rerank properly orders documents by score"""
         query = "test query"
         docs = ["low score doc", "high score doc", "medium score doc"]
-        
-        with patch.object(reranker, 'process_inputs') as mock_process, \
-             patch.object(reranker, 'compute_logits') as mock_compute:
-            
+
+        with patch.object(reranker, '_process_inputs') as mock_process, \
+             patch.object(reranker, '_compute_logits') as mock_compute:
+
             mock_process.return_value = {'input_ids': torch.tensor([[1, 2, 3]])}
             # Return scores in order: low, high, medium
             mock_compute.return_value = [0.2, 0.9, 0.6]
@@ -301,8 +301,8 @@ class TestRAGReranker:
         query = "test query"
         docs = ["doc1", "doc2", "doc3"]
         
-        with patch.object(reranker, 'process_inputs') as mock_process, \
-             patch.object(reranker, 'compute_logits') as mock_compute:
+        with patch.object(reranker, '_process_inputs') as mock_process, \
+             patch.object(reranker, '_compute_logits') as mock_compute:
             
             mock_process.return_value = {'input_ids': torch.tensor([[1, 2, 3]])}
             mock_compute.return_value = [0.8, 0.6, 0.9]

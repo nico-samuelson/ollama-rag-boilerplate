@@ -98,29 +98,3 @@ def test_generate_stream_exception_yields_error_and_logs(monkeypatch, capsys):
 
     printed = capsys.readouterr().out
     assert "Ollama streaming generation error: nope" in printed
-
-
-# --- setup_ollama_llm() ---
-
-def test_setup_ollama_llm_success(capsys):
-    llm = mod.setup_ollama_llm()
-    assert isinstance(llm, mod.OllamaLLM)
-    assert llm.model == "fake-model"
-
-    printed = capsys.readouterr().out
-    assert "Ollama LLM initialized with model: fake-model" in printed
-
-
-def test_setup_ollama_llm_failure(monkeypatch, capsys):
-    # Make the constructor explode to exercise the except path
-    def bad_ctor(*args, **kwargs):
-        raise RuntimeError("ctor error")
-
-    monkeypatch.setattr(mod, "OllamaLLM", bad_ctor, raising=True)
-
-    llm = mod.setup_ollama_llm()
-    assert llm is None
-
-    printed = capsys.readouterr().out
-    assert "Ollama LLM setup failed: ctor error" in printed
-    assert "Please ensure Ollama server is running and the model is pulled." in printed

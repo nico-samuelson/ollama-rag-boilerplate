@@ -1,193 +1,170 @@
-from pathlib import Path
-from unittest.mock import Mock, patch
+import os
+import io
 import pytest
-import loader as mod
 
-# ----------------------------
-# validate_pdf_file tests
-# ----------------------------
-
-def test_validate_pdf_file_nonexistent():
-    with pytest.raises(FileNotFoundError):
-        mod.validate_pdf_file("does/not/exist.pdf")
-
-
-def test_validate_pdf_file_wrong_extension(tmp_path: Path):
-    p = tmp_path / "note.txt"
-    p.write_text("just text")
-    with pytest.raises(ValueError) as excinfo:
-        mod.validate_pdf_file(str(p))
-    assert "File is not a PDF" in str(excinfo.value)
-
-
-def test_validate_pdf_file_invalid_header(tmp_path: Path):
-    p = tmp_path / "bad.pdf"
-
-    # Wrong header; must be exactly b'%PDF' in the first 4 bytes
-    p.write_bytes(b"%PDX-1.7\nrest")
-    with pytest.raises(ValueError) as excinfo:
-        mod.validate_pdf_file(str(p))
-    assert "does not appear to be a valid PDF" in str(excinfo.value)
-
-
-def test_validate_pdf_file_valid_pdf(tmp_path: Path, capsys):
-    p = tmp_path / "valid.pdf"
-
-    # Correct header; function only checks first four bytes
-    p.write_bytes(b"%PDF-1.4\nmore bytes")
-    mod.validate_pdf_file(str(p))
-    out = capsys.readouterr().out
-    assert "PDF file validated" in out
-
-
-# ----------------------------
-# load_document tests
-# ----------------------------
-
-def test_load_document_pdf_success(tmp_path: Path):
-    p = tmp_path / "file.pdf"
-    p.write_bytes(b"%PDF-1.4\n")
-
-    fake_loader_instance = Mock()
-    fake_doc1 = Mock(page_content="page one")
-    fake_doc2 = Mock(page_content="page two")
-    fake_loader_instance.load.return_value = [fake_doc1, fake_doc2]
-
-    with patch.object(mod, "PyPDFLoader", return_value=fake_loader_instance) as patched:
-        docs = mod.load_document(str(p))
-
-    patched.assert_called_once_with(str(p))
-    assert len(docs) == 2
-    assert docs[0].page_content == "page one"
-    assert docs[1].page_content == "page two"
-
-
-def test_load_document_txt_success(tmp_path: Path):
-    p = tmp_path / "sample.txt"
-    p.write_text("hello world")
-
-    fake_loader_instance = Mock()
-    fake_doc = Mock(page_content="hello world")
-    fake_loader_instance.load.return_value = [fake_doc]
-
-    with patch.object(mod, "TextLoader", return_value=fake_loader_instance) as patched:
-        docs = mod.load_document(str(p))
-
-    patched.assert_called_once_with(str(p))
-    assert len(docs) == 1
-    assert docs[0].page_content == "hello world"
-
-
-def test_load_document_unsupported_extension(tmp_path: Path):
-    p = tmp_path / "notes.md"
-    p.write_text("# heading")
-    with pytest.raises(ValueError) as excinfo:
-        mod.load_document(str(p))
-    assert "Unsupported file type" in str(excinfo.value)
-
-
-def test_load_document_empty_load_raises_runtimeerror(tmp_path: Path):
-    p = tmp_path / "empty.pdf"
-    p.write_bytes(b"%PDF-1.4\n")
-
-    fake_loader_instance = Mock()
-    fake_loader_instance.load.return_value = []
-
-    with patch.object(mod, "PyPDFLoader", return_value=fake_loader_instance):
-        with pytest.raises(RuntimeError) as excinfo:
-            mod.load_document(str(p))
-    assert "No content loaded" in str(excinfo.value)
-
-
-def test_load_document_loader_raises_is_reraised(tmp_path: Path, capsys):
-    p = tmp_path / "boom.pdf"
-    p.write_bytes(b"%PDF-1.4\n")
-
-    def _constructor(_path):
-        raise RuntimeError("loader explode")
-
-    with patch.object(mod, "PyPDFLoader", side_effect=_constructor):
-        with pytest.raises(RuntimeError) as excinfo:
-            mod.load_document(str(p))
-
-    # The function prints a helpful message, then re-raises
-    out = capsys.readouterr().out
-    assert "Document loading failed for" in out
-    assert "loader explode" in str(excinfo.value)
-
-
-# ----------------------------
-# preprocess_document tests
-# ----------------------------
-
-class SimpleDoc:
-    def __init__(self, text):
+# ---------- Fakes ----------
+class FakeDoc:
+    def __init__(self, text, metadata=None):
         self.page_content = text
-        self.metadata = {}
+        self.metadata = metadata or {}
+
+class FakePDFLoader:
+    to_return = [FakeDoc("PDF page 1 content " + "x" * 80)]
+
+    def __init__(self, path):
+        self.path = path
+
+    def load(self):
+        return list(type(self).to_return)
+
+class FakeTextLoader:
+    to_return = [FakeDoc("TXT content " + "y" * 80)]
+
+    def __init__(self, path):
+        self.path = path
+
+    def load(self):
+        return list(type(self).to_return)
 
 
-def test_preprocess_document_cleans_whitespace_and_keeps_long_docs():
-    # Note: the function collapses ALL whitespace (including newlines) into single spaces,
-    # then tries to split on '\n' (which won't do much after collapsing). We test the observed behavior.
-    noisy_text = "Line   1 \n\n with   extra   spaces \n and   newlines.\n"
-
-    # Make it long enough (>50 chars) so it isn't filtered out
-    noisy_text = (noisy_text + " ")*5
-
-    doc = SimpleDoc(noisy_text)
-    out = mod.preprocess_document([doc])
-
-    assert len(out) == 1
-    # In-place mutation expected
-    assert out[0] is doc
-    assert "  " not in doc.page_content  # no double spaces
-    assert "\n" not in doc.page_content  # newlines collapsed
-    assert len(doc.page_content.strip()) > 50
+# ---------- Helpers ----------
+def write_bytes(p, b):
+    p.write_bytes(b)
+    return str(p)
 
 
-def test_preprocess_document_filters_short_docs():
-    short_text = "Too short to keep."
-    doc = SimpleDoc(short_text)
-    out = mod.preprocess_document([doc])
-    assert out == []
+# ---------- Tests ----------
+def test_validate_pdf_file_happy_path(tmp_path):
+    from loader import DocumentLoader
+    pdf = tmp_path / "doc.pdf"
+    # Minimal valid header + some bytes
+    write_bytes(pdf, b"%PDF" + b"\n%EOF")
+
+    DocumentLoader(str(pdf)).validate_pdf_file()  # should not raise
 
 
-def test_preprocess_document_skips_very_short_lines_if_any_left():
-    # Even though newlines are collapsed, we can still provide a long-enough content
-    # and ensure it's kept; short (<4 char) lines would be excluded if present.
-    text = "abc\nde\nfghi jkl mno pqr stu vwx yz " * 3  # length > 50 after collapsing
-    doc = SimpleDoc(text)
-    out = mod.preprocess_document([doc])
-    assert len(out) == 1
-    # Collapsed and trimmed
-    assert "  " not in out[0].page_content
-    assert "\n" not in out[0].page_content
+def test_validate_pdf_file_missing_file(tmp_path):
+    from loader import DocumentLoader
+    missing = tmp_path / "nope.pdf"
+    with pytest.raises(FileNotFoundError):
+        DocumentLoader(str(missing)).validate_pdf_file()
 
 
-# ----------------------------
-# Integration-ish smoke tests
-# ----------------------------
+def test_validate_pdf_file_wrong_extension(tmp_path):
+    from loader import DocumentLoader
+    txt = tmp_path / "doc.txt"
+    write_bytes(txt, b"not a pdf")
+    with pytest.raises(ValueError):
+        DocumentLoader(str(txt)).validate_pdf_file()
 
-def test_end_to_end_pdf_path_then_preprocess(tmp_path: Path):
-    # Create a valid-looking PDF file
-    pdf = tmp_path / "ok.pdf"
-    pdf.write_bytes(b"%PDF-1.5\nrest")
-    # validate should pass
-    mod.validate_pdf_file(str(pdf))
 
-    # Mock loading two pages so preprocess has something to clean
-    page1 = SimpleDoc("First    page \n with   noise.\n")
-    page2 = SimpleDoc("Second   page \n with more   noise.\n" + "x" * 60)
+def test_validate_pdf_file_invalid_header(tmp_path):
+    from loader import DocumentLoader
+    pdf = tmp_path / "doc.pdf"
+    write_bytes(pdf, b"%PDX" + b"\nwhatever")
+    with pytest.raises(ValueError):
+        DocumentLoader(str(pdf)).validate_pdf_file()
 
-    fake_loader_instance = Mock()
-    fake_loader_instance.load.return_value = [page1, page2]
 
-    with patch.object(mod, "PyPDFLoader", return_value=fake_loader_instance):
-        docs = mod.load_document(str(pdf))
+def test_load_document_pdf_success(monkeypatch, tmp_path):
+    import loader
+    # Patch loaders with fakes
+    monkeypatch.setattr(loader, "PyPDFLoader", FakePDFLoader)
+    monkeypatch.setattr(loader, "TextLoader", FakeTextLoader)
 
-    processed = mod.preprocess_document(docs)
-    # page1 likely gets filtered (<50 chars after cleaning), page2 kept
+    pdf = tmp_path / "doc.pdf"
+    write_bytes(pdf, b"%PDF" + b"\n%EOF")
+
+    dl = loader.DocumentLoader(str(pdf))
+    docs = dl.load_document()
+    assert isinstance(docs, list) and len(docs) == len(FakePDFLoader.to_return)
+    assert all(hasattr(d, "page_content") for d in docs)
+
+
+def test_load_document_txt_success(monkeypatch, tmp_path):
+    import loader
+    monkeypatch.setattr(loader, "PyPDFLoader", FakePDFLoader)
+    monkeypatch.setattr(loader, "TextLoader", FakeTextLoader)
+
+    txt = tmp_path / "doc.txt"
+    txt.write_text("line 1\nline 2\n" + "z" * 100, encoding="utf-8")
+
+    dl = loader.DocumentLoader(str(txt))
+    docs = dl.load_document()
+    assert isinstance(docs, list) and len(docs) == len(FakeTextLoader.to_return)
+    assert all(hasattr(d, "page_content") for d in docs)
+
+
+def test_load_document_unsupported_extension(tmp_path):
+    from loader import DocumentLoader
+    md = tmp_path / "doc.md"
+    md.write_text("# not supported", encoding="utf-8")
+    with pytest.raises(ValueError):
+        DocumentLoader(str(md)).load_document()
+
+
+def test_load_document_empty_results_raises(monkeypatch, tmp_path):
+    import loader
+    monkeypatch.setattr(loader, "PyPDFLoader", FakePDFLoader)
+    monkeypatch.setattr(loader, "TextLoader", FakeTextLoader)
+
+    # Force empty result from TextLoader
+    FakeTextLoader.to_return = []
+
+    txt = tmp_path / "empty.txt"
+    txt.write_text("some content", encoding="utf-8")
+
+    dl = loader.DocumentLoader(str(txt))
+    with pytest.raises(RuntimeError):
+        dl.load_document()
+
+    # reset for other tests
+    FakeTextLoader.to_return = [FakeDoc("TXT content " + "y" * 80)]
+
+
+def test_load_document_loader_exception_propagates(monkeypatch, tmp_path):
+    import loader
+
+    class BoomTextLoader(FakeTextLoader):
+        def load(self):
+            raise IOError("disk error")
+
+    monkeypatch.setattr(loader, "TextLoader", BoomTextLoader)
+
+    txt = tmp_path / "boom.txt"
+    txt.write_text("some content", encoding="utf-8")
+
+    dl = loader.DocumentLoader(str(txt))
+    with pytest.raises(IOError):
+        dl.load_document()
+
+
+def test_preprocess_document_filters_and_cleans():
+    from loader import DocumentLoader
+
+    # Short doc (<50) should be dropped
+    short = FakeDoc("a b c  d")  # after cleanup still too short
+
+    # Long doc with messy whitespace and short lines to remove
+    long_text = (
+        "Header\n"          # <= 6 chars but still >3, stays
+        "a\n"               # <=3, gets removed
+        "This   is   a      long   line   with   extra   spaces.   "
+        "\n"
+        "ok\n"
+        + "content " * 20
+    )
+    long = FakeDoc(long_text)
+
+    dl = DocumentLoader("ignored.txt")
+    processed = dl.preprocess_document([short, long])
+
+    # Only the long one should survive
     assert len(processed) == 1
-    assert processed[0] is page2
-    assert "  " not in processed[0].page_content
-    assert "\n" not in processed[0].page_content
+    out = processed[0].page_content
+    # Excess spaces collapsed
+    assert "  " not in out
+    # Very short lines removed
+    assert "\na\n" not in out
+    # Still substantial (>50 chars)
+    assert len(out.strip()) > 50

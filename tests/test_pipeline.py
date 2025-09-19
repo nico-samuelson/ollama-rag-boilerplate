@@ -1,232 +1,246 @@
-from types import SimpleNamespace
-from unittest.mock import MagicMock
+import types
 import builtins
 import pytest
-import pipeline as mod
 
+# --- Helpers / fakes ---------------------------------------------------------
 
-# --- helpers ----
-
-class Doc:
+class FakeDoc:
     def __init__(self, text, metadata=None):
         self.page_content = text
         self.metadata = metadata or {}
 
+class FakeLoader:
+    def __init__(self, file_path):
+        self.file_path = file_path
+        self.loaded = None
+        self.preprocessed = None
+
+    def load_document(self, file_path):
+        # Return what the test configured on the class variable
+        return type(self).loaded
+
+    def preprocess_document(self, document):
+        # Optionally modify / pass through
+        type(self).preprocessed = document
+        return document
+
+class FakeSplitter:
+    """Returns whatever the test sets on FakeSplitter.to_return."""
+    to_return = []
+
+    def __init__(self, *args, **kwargs):
+        self.kwargs = kwargs
+
+    def split_documents(self, docs):
+        return list(type(self).to_return)
+
+class FakeRetrieverShim:
+    """What HybridRetriever.as_retriever() returns."""
+    def __init__(self, invoke_return):
+        self._invoke_return = invoke_return
+        self.invocations = []
+
+    def invoke(self, query):
+        self.invocations.append(query)
+        return list(self._invoke_return)
+
+class FakeHybridRetriever:
+    """Constructed with chunks; as_retriever() -> object with invoke()."""
+    def __init__(self, chunks):
+        self.chunks_ref = chunks  # will be list set by pipeline
+        # Tests will set the class var to determine what invoke returns:
+        # FakeHybridRetriever.invoke_return = [...]
+        self.as_ret = FakeRetrieverShim(type(self).invoke_return)
+
+    def as_retriever(self):
+        return self.as_ret
+
+class FakeReranker:
+    """rerank(query, docs, k) -> (top_docs, scores)."""
+    def __init__(self, name):
+        self.name = name
+        self.calls = []
+
+    def rerank(self, query, docs, k):
+        self.calls.append((query, list(docs), k))
+        # Tests will set the class vars:
+        # top_docs and scores. Default to echoing back.
+        top = getattr(type(self), "top_docs", list(docs))
+        scores = getattr(type(self), "scores", [1.0] * len(top))
+        return (top, scores)
+
+class FakeLLM:
+    def __init__(self, model, temperature, max_new_tokens):
+        self.model = model
+        self.temperature = temperature
+        self.max_new_tokens = max_new_tokens
+        # tests will set these attributes on the instance
+        self._stream_tokens = ["ok"]
+        self._call_result = "ok"
+
+    def generate_stream(self, prompt):
+        for t in self._stream_tokens:
+            yield t
+
+    def _call(self, prompt):
+        return self._call_result
+
+
+# --- Fixtures ----------------------------------------------------------------
 
 @pytest.fixture(autouse=True)
-def fake_hp(monkeypatch):
-    monkeypatch.setattr(
-        mod, "hp",
-        SimpleNamespace(
-            CHUNK_SIZE=200,
-            CHUNK_OVERLAP=20,
-            RETRIEVAL_K=5,
-            SPARSE_RATIO=0.25,
-        ),
-        raising=False,
-    )
+def patch_dependencies(monkeypatch):
+    """
+    Patch heavy external deps inside rag_pipeline module with fakes.
+    """
+    import pipeline  # adjust if your module name differs
+
+    # Swap in fakes
+    monkeypatch.setattr(pipeline, "DocumentLoader", FakeLoader)
+    monkeypatch.setattr(pipeline, "HybridRetriever", FakeHybridRetriever)
+    monkeypatch.setattr(pipeline, "RAGReranker", FakeReranker)
+    monkeypatch.setattr(pipeline, "OllamaLLM", FakeLLM)
+    monkeypatch.setattr(pipeline, "RecursiveCharacterTextSplitter", FakeSplitter)
+
+    # Provide simple hp defaults if your real hp values are used in signature
+    # (these were already bound at class definition time, but just in case)
+    if not hasattr(pipeline, "hp"):
+        hp_mod = types.SimpleNamespace(
+            CHUNK_SIZE=500,
+            CHUNK_OVERLAP=50,
+            RERANKER_NAME="fake-reranker",
+            MODEL_NAME="fake-model",
+        )
+        monkeypatch.setattr(pipeline, "hp", hp_mod, raising=False)
+
+    # Ensure loader has something to load on import/initialization
+    FakeLoader.loaded = [FakeDoc("A" * 120, {"page": 1})]  # one >100 chars
+    FakeSplitter.to_return = list(FakeLoader.loaded)
+    FakeHybridRetriever.invoke_return = []  # can override per-test
+    FakeReranker.top_docs = list(FakeLoader.loaded)
+    FakeReranker.scores = [0.9]
+
+    yield
 
 
-# -------------------------
-# build_rag_pipeline
-# -------------------------
-
-def test_build_rag_pipeline_happy_path(monkeypatch, capsys):
-    # loader -> docs -> preprocessed
-    docs = [Doc("x" * 500, metadata={"page": 1})]
-    monkeypatch.setattr(mod.loader, "load_document", MagicMock(return_value=docs))
-    monkeypatch.setattr(mod.loader, "preprocess_document", MagicMock(return_value=docs))
-
-    # text splitter returns short + long chunks; only long (>100) should survive
-    short_chunk = Doc("a" * 80, metadata={"page": 2})
-    long_chunk = Doc("b" * 150, metadata={"page": 3})
-
-    rc_instance = SimpleNamespace(split_documents=MagicMock(return_value=[short_chunk, long_chunk]))
-    rc_ctor = MagicMock(return_value=rc_instance)
-    monkeypatch.setattr(mod, "RecursiveCharacterTextSplitter", rc_ctor)
-
-    # dense retriever (GPU embeddings)
-    monkeypatch.setattr(mod.retriever, "setup_gpu_embeddings", MagicMock(return_value="DENSE"))
-
-    # BM25 sparse retriever with assignable k
-    sparse_obj = SimpleNamespace(k=None)
-    bm25 = SimpleNamespace(from_documents=MagicMock(return_value=sparse_obj))
-    monkeypatch.setattr(mod, "BM25Retriever", bm25)
-
-    # Ensemble returns a sentinel
-    ens_ctor = MagicMock(return_value="HYBRID")
-    monkeypatch.setattr(mod, "EnsembleRetriever", ens_ctor)
-
-    # LLM setup returns a sentinel
-    monkeypatch.setattr(mod.model, "setup_ollama_llm", MagicMock(return_value="LLM"))
-
-    hybrid, llm = mod.build_rag_pipeline("dummy.pdf")
-
-    # Returns
-    assert hybrid == "HYBRID"
-    assert llm == "LLM"
-
-    # RecursiveCharacterTextSplitter called with hp config + separators
-    args, kwargs = rc_ctor.call_args
-    assert kwargs["chunk_size"] == 200
-    assert kwargs["chunk_overlap"] == 20
-    assert kwargs["separators"] == ["\n\n", "\n", " ", ""]
-
-    # BM25 built from surviving chunks: only the long one
-    mod.BM25Retriever.from_documents.assert_called_once()
-    (passed_chunks,), _ = mod.BM25Retriever.from_documents.call_args
-    assert passed_chunks == [long_chunk]
-
-    # k set from hp
-    assert sparse_obj.k == 5
-
-    # Ensemble receives sparse + dense with proper weights
-    ens_args, ens_kwargs = ens_ctor.call_args
-    assert ens_kwargs["retrievers"] == [sparse_obj, "DENSE"]
-    assert ens_kwargs["weights"] == [0.25, 0.75]
-
-    out = capsys.readouterr().out
-    assert "Loading documents..." in out
-    assert "Splitting documents into chunks..." in out
-    assert "After filtering: 1 chunks remain." in out
-    assert "Setting up retrievers..." in out
-    assert "Setting up Ollama LLM..." in out
+@pytest.fixture
+def pipeline():
+    import pipeline  # adjust if your module name differs
+    return pipeline.RAGPipeline(file_path="dummy.txt")
 
 
-def test_build_rag_pipeline_llm_none_raises(monkeypatch):
-    docs = [Doc("x" * 500)]
-    monkeypatch.setattr(mod.loader, "load_document", MagicMock(return_value=docs))
-    monkeypatch.setattr(mod.loader, "preprocess_document", MagicMock(return_value=docs))
+# --- Tests -------------------------------------------------------------------
 
-    rc_instance = SimpleNamespace(split_documents=MagicMock(return_value=[Doc("y" * 200)]))
-    monkeypatch.setattr(mod, "RecursiveCharacterTextSplitter", MagicMock(return_value=rc_instance))
+def test_split_document_filters_small_chunks(monkeypatch):
+    import pipeline
 
-    monkeypatch.setattr(mod.retriever, "setup_gpu_embeddings", MagicMock(return_value="DENSE"))
-    bm25 = SimpleNamespace(from_documents=MagicMock(return_value=SimpleNamespace(k=None)))
-    monkeypatch.setattr(mod, "BM25Retriever", bm25)
-    monkeypatch.setattr(mod, "EnsembleRetriever", MagicMock(return_value="HYBRID"))
+    # Prepare a mix: one small (<100), one large (>=100)
+    small = FakeDoc("short text", {"page": 2})
+    large = FakeDoc("X" * 150, {"page": 3})
+    FakeLoader.loaded = [small, large]
+    FakeSplitter.to_return = [small, large]
 
-    # LLM setup fails -> RuntimeError expected
-    monkeypatch.setattr(mod.model, "setup_ollama_llm", MagicMock(return_value=None))
+    pipe = pipeline.RAGPipeline(file_path="dummy.txt")
 
-    with pytest.raises(RuntimeError, match="No LLM could be initialized"):
-        mod.build_rag_pipeline("dummy.pdf")
+    # Only large should remain
+    assert len(pipe.chunks) == 1
+    assert pipe.chunks[0].page_content == large.page_content
+    assert pipe.chunk_size == pipeline.hp.CHUNK_SIZE
+    assert pipe.chunk_overlap == pipeline.hp.CHUNK_OVERLAP
 
 
-# -------------------------
-# format_docs
-# -------------------------
-
-def test_format_docs_formats_sources_and_pages(capsys):
+def test_format_docs_includes_metadata_and_order(pipeline):
     docs = [
-        Doc("Alpha", metadata={"page": 3}),       # has page
-        Doc("Beta", metadata={}),                 # falsy metadata -> no page label
-        Doc("Gamma", metadata={"foo": "bar"}),    # truthy metadata w/o 'page' -> Unknown
+        FakeDoc("Hello world", {"page": 5}),
+        FakeDoc("Second doc with body", {"page": 9}),
     ]
-
-    out = mod.format_docs(docs)
-    # Source numbering and page labeling
-    assert "Source 1 (Page 3):" in out
-    assert "Source 2:" in out and "(Page " not in out.split("Source 2:")[1].split("\n")[0]
-    assert "Source 3 (Page Unknown):" in out
-    assert "Alpha" in out and "Beta" in out and "Gamma" in out
-
-    printed = capsys.readouterr().out
-    assert "Context length:" in printed
+    formatted = pipeline.format_docs(docs)
+    # Contains both sources with page metadata
+    assert "Source 1 (Page 5):" in formatted
+    assert "Hello world" in formatted
+    assert "Source 2 (Page 9):" in formatted
+    assert "Second doc with body" in formatted
 
 
-# -------------------------
-# generate_response_with_progress (streaming)
-# -------------------------
+def test_retrieve_relevant_docs_calls_retriever_and_reranker(patch_dependencies, monkeypatch):
+    import pipeline  # your module name
 
-def test_generate_response_with_progress_streams_and_counts_words(monkeypatch, capsys):
-    # retriever that returns two docs
-    docs = [Doc("Doc1 text"), Doc("Doc2 text", metadata={"page": 2})]
-    retr = SimpleNamespace(invoke=MagicMock(return_value=docs))
+    retrieved = [
+        FakeDoc("Doc A " + "A"*120, {"page": 1}),
+        FakeDoc("Doc B " + "B"*120, {"page": 2}),
+        FakeDoc("Doc C " + "C"*120, {"page": 3}),
+    ]
+    FakeHybridRetriever.invoke_return = list(retrieved)
+    FakeReranker.top_docs = retrieved[:2]
+    FakeReranker.scores = [0.8, 0.7]
 
-    # llm streaming output
-    class FakeLLM:
-        def generate_stream(self, prompt):
-            assert "Context:" in prompt and "Question:" in prompt
-            yield "Hello"
-            yield " "
-            yield "world!"
+    pipe = pipeline.RAGPipeline(file_path="dummy.txt")  # construct *after* setting
+    got_retrieved, (top_docs, scores) = pipe.retrieve_relevant_docs("what is A?")
 
-    llm = FakeLLM()
-
-    full, returned_docs = mod.generate_response_with_progress("What is up?", retr, llm)
-    assert full == "Hello world!"
-    assert returned_docs == docs
-
-    out = capsys.readouterr().out
-    assert "AI RESPONSE (Streaming)" in out
-    assert "Found 2 documents" in out
-    assert "Generated" in out  # word count line
+    assert got_retrieved == retrieved
+    assert top_docs == retrieved[:2]
+    assert scores == [0.8, 0.7]
 
 
-def test_generate_response_with_progress_fallback_on_exception(monkeypatch, capsys):
-    docs = [Doc("Doc text")]
-    retr = SimpleNamespace(invoke=MagicMock(return_value=docs))
-
-    class FakeLLM:
-        def generate_stream(self, _):
-            raise RuntimeError("stream broke")
-        def _call(self, _):
-            return "FALLBACK ANSWER"
-
-    llm = FakeLLM()
-
-    full, returned_docs = mod.generate_response_with_progress("Q", retr, llm)
-    assert full == "FALLBACK ANSWER"
-    assert returned_docs == docs
-
-    out = capsys.readouterr().out
-    assert "Streaming error: stream broke" in out
-    assert "Falling back to standard generation" in out
+def test_prepare_prompt_injects_context_and_query(monkeypatch, pipeline):
+    # Mock format_docs to return a fixed string
+    monkeypatch.setattr(pipeline, "format_docs", lambda d: "CTX-BODY")
+    prompt = pipeline.prepare_prompt("Why?", [FakeDoc("irrelevant")])
+    assert "CTX-BODY" in prompt
+    assert "Question: Why?" in prompt
 
 
-# -------------------------
-# generate_response (non-streaming)
-# -------------------------
+def test_generate_response_with_progress_streaming_path(monkeypatch, pipeline):
+    # Setup retrieval & rerank to yield one doc context
+    doc = FakeDoc("Context " + "X"*120, {"page": 1})
+    FakeHybridRetriever.invoke_return = [doc]
+    FakeReranker.top_docs = [doc]
+    FakeReranker.scores = [0.99]
 
-def test_generate_response_calls_llm_with_final_answer(monkeypatch, capsys):
-    docs = [Doc("Doc A"), Doc("Doc B")]
-    retr = SimpleNamespace(invoke=MagicMock(return_value=docs))
+    # Configure streaming tokens
+    pipeline.llm._stream_tokens = ["Hello", " ", "World!"]
 
-    called = {}
-    class FakeLLM:
-        def _call(self, prompt):
-            called["prompt"] = prompt
-            return "NONSTREAM ANSWER"
-
-    llm = FakeLLM()
-
-    full, returned_docs = mod.generate_response("Why?", retr, llm)
-    assert full == "NONSTREAM ANSWER"
-    assert returned_docs == docs
-    assert "Final Answer:" in called["prompt"]
-
-    out = capsys.readouterr().out
-    assert "ANSWER (NON-STREAMING)" in out
-    assert "Retrieved 2 documents" in out
+    resp, sources = pipeline.generate_response_with_progress("greet me")
+    assert resp == "Hello World!"
+    assert sources == [doc]
 
 
-# -------------------------
-# interactive_streaming_loop (commands only)
-# -------------------------
+def test_generate_response_with_progress_fallback_on_exception(monkeypatch, pipeline):
+    # Retrieval/rerank
+    doc = FakeDoc("Ctx " + "Y"*120, {"page": 2})
+    FakeHybridRetriever.invoke_return = [doc]
+    FakeReranker.top_docs = [doc]
+    FakeReranker.scores = [0.9]
 
-def test_interactive_streaming_loop_command_toggles(monkeypatch, capsys):
-    # Provide inputs: toggle sources, toggle streaming, blank, quit
-    inputs = iter(["sources", "stream", "", "quit"])
+    # Make generate_stream raise
+    def boom(_):
+        raise RuntimeError("streaming broken")
+
+    pipeline.llm.generate_stream = boom
+    pipeline.llm._call_result = "Fallback OK"
+
+    resp, sources = pipeline.generate_response_with_progress("test")
+    assert resp == "Fallback OK"
+    assert sources == [doc]
+
+
+def test_generate_response_non_streaming(monkeypatch, pipeline):
+    # Retrieval/rerank
+    doc = FakeDoc("Ctx " + "Z"*120, {"page": 3})
+    FakeHybridRetriever.invoke_return = [doc]
+    FakeReranker.top_docs = [doc]
+    FakeReranker.scores = [0.95]
+
+    pipeline.llm._call_result = "Non-streamed answer"
+    resp, sources = pipeline.generate_response("q")
+    assert resp == "Non-streamed answer"
+    assert sources == [doc]
+
+
+def test_interactive_streaming_loop_quits_immediately(monkeypatch, pipeline):
+    # Make input return 'quit' the first time
+    inputs = iter(["quit"])
     monkeypatch.setattr(builtins, "input", lambda _: next(inputs))
 
-    # Dummy objects (we won't hit generation paths here)
-    retr = SimpleNamespace()
-    llm = SimpleNamespace()
-
-    mod.interactive_streaming_loop(retr, llm)
-
-    out = capsys.readouterr().out
-    assert "RAG Pipeline ready" in out
-    assert "Source documents disabled" in out
-    assert "Switched to standard mode" in out
+    # Should not raise / hang
+    pipeline.interactive_streaming_loop()

@@ -1,121 +1,196 @@
-from types import SimpleNamespace
-from unittest.mock import Mock, patch
+import types
+import uuid
 import pytest
-import retriever as mod
+from unittest.mock import MagicMock
 
+# ---- Adjust this import if your filename is different ----
+import retriever as hr
+# ---------------------------------------------------------
 
-@pytest.fixture(autouse=True)
-def fake_hp(monkeypatch):
-    # Ensure predictable hyperparameters for tests
-    monkeypatch.setattr(
-        mod, "hp",
-        SimpleNamespace(EMBEDDING_NAME="fake-embed-model", RETRIEVAL_K=7),
-        raising=False
-    )
+from langchain.schema import Document
 
+@pytest.fixture
+def hp_patch(monkeypatch):
+    # Ensure predictable hyperparameters inside the module under test
+    monkeypatch.setattr(hr, "hp", types.SimpleNamespace(
+        EMBEDDING_NAME="all-MiniLM-L6-v2",
+        SPARSE_RATIO=0.3,
+        RETRIEVAL_K=5
+    ))
 
-def _make_fake_vectorstore():
-    # A minimal vectorstore with as_retriever()
-    retriever = object()
-    fake_vs = SimpleNamespace(as_retriever=Mock(return_value=retriever))
-    return fake_vs, retriever
+@pytest.fixture
+def dummy_docs():
+    # Some docs missing .id on purpose to test BM25 id assignment
+    return [
+        Document(page_content="alpha text", metadata={"id": "keep-existing"}),
+        Document(page_content="bravo text"),
+        Document(page_content="charlie text", metadata={"source": "x"}),
+    ]
 
+# ----- Utilities (simple fakes) -----
+class FakeVectorStore:
+    def __init__(self):
+        self.as_retriever_called_with = None
 
-def test_gpu_path_uses_cuda_and_batchsize_32(capsys):
-    chunks = ["c1", "c2"]
-    fake_vs, retriever_obj = _make_fake_vectorstore()
+    def as_retriever(self, **kwargs):
+        self.as_retriever_called_with = kwargs
+        marker = types.SimpleNamespace(kind="dense_retriever", kwargs=kwargs)
+        return marker
 
-    with patch.object(mod.torch.cuda, "is_available", return_value=True), \
-         patch.object(mod, "SentenceTransformerEmbeddings", autospec=True) as STE, \
-         patch.object(mod, "Chroma", autospec=True) as Chroma:
+class FakeFAISS:
+    def __init__(self):
+        self.last_args = None
+        self.last_kwargs = None
+        self.vectorstore = FakeVectorStore()
 
-        Chroma.from_documents.return_value = fake_vs
+    def from_documents(self, *args, **kwargs):
+        self.last_args = args
+        self.last_kwargs = kwargs
+        return self.vectorstore
 
-        result = mod.setup_gpu_embeddings(chunks)
+class FakeBM25:
+    def __init__(self):
+        self.k = None
 
-        # Returned retriever is whatever vectorstore.as_retriever() yielded
-        assert result is retriever_obj
+    @classmethod
+    def from_documents(cls, docs):
+        inst = cls()
+        inst.docs = docs
+        return inst
 
-        # Embeddings constructed with proper device + batch_size 32
-        assert STE.call_count == 1
-        kwargs = STE.call_args.kwargs
-        assert kwargs["model_name"] == "fake-embed-model"
-        assert kwargs["model_kwargs"] == {"device": "cuda", "trust_remote_code": True}
-        assert kwargs["encode_kwargs"] == {"batch_size": 32, "trust_remote_code": True}
+class CaptureEnsemble:
+    """Captures constructor arguments and returns a simple marker object."""
+    def __init__(self, retrievers, weights):
+        self.retrievers = retrievers
+        self.weights = weights
 
-        # Chroma called with persist_directory
-        Chroma.from_documents.assert_called_once()
-        _, ch_kwargs = Chroma.from_documents.call_args
-        assert ch_kwargs["persist_directory"] == "./chroma_db"
+# Fake SentenceTransformer that records encode() calls
+class CaptureST:
+    def __init__(self, model_name, device=None):
+        self.model_name = model_name
+        self.device = device
+        self.calls = []
 
-        out = capsys.readouterr().out
-        assert "Embeddings using cuda" in out
+    def encode(self, texts, **kwargs):
+        # record call, return fixed-size vectors (len=texts)
+        self.calls.append({"texts": texts, "kwargs": kwargs})
+        import numpy as np
+        arr = np.ones((len(texts), 3), dtype="float32")
+        return arr
 
+@pytest.fixture
+def patch_heavy_deps(monkeypatch):
+    # Patch FAISS
+    fake_faiss = FakeFAISS()
+    monkeypatch.setattr(hr, "FAISS", types.SimpleNamespace(from_documents=fake_faiss.from_documents))
 
-def test_try_path_on_cpu_sets_batchsize_16_and_prints_cpu(capsys):
-    chunks = ["c1"]
+    # Patch BM25Retriever
+    monkeypatch.setattr(hr, "BM25Retriever", FakeBM25)
 
-    fake_vs, retriever_obj = _make_fake_vectorstore()
+    # Patch EnsembleRetriever
+    captured = {}
+    def _capture_ensemble(*, retrievers, weights):
+        cap = CaptureEnsemble(retrievers, weights)
+        captured["instance"] = cap
+        return cap
+    monkeypatch.setattr(hr, "EnsembleRetriever", _capture_ensemble)
 
-    with patch.object(mod.torch.cuda, "is_available", return_value=False), \
-         patch.object(mod, "SentenceTransformerEmbeddings", autospec=True) as STE, \
-         patch.object(mod, "Chroma", autospec=True) as Chroma:
+    # Patch torch device availability deterministically (we’ll override per-test if needed)
+    monkeypatch.setattr(hr.torch.cuda, "is_available", lambda: False)
+    # MPS presence check
+    if getattr(hr.torch.backends, "mps", None):
+        monkeypatch.setattr(hr.torch.backends.mps, "is_available", lambda: False)
 
-        Chroma.from_documents.return_value = fake_vs
+    # Patch SentenceTransformer (used by Qwen3Embeddings)
+    monkeypatch.setattr(hr, "SentenceTransformer", CaptureST)
 
-        result = mod.setup_gpu_embeddings(chunks)
-        assert result is retriever_obj
+    # Patch SentenceTransformerEmbeddings (fallback path)
+    class FakeSTEmb:
+        def __init__(self, model_name, model_kwargs=None, encode_kwargs=None):
+            self.model_name = model_name
+            self.model_kwargs = model_kwargs or {}
+            self.encode_kwargs = encode_kwargs or {}
+    monkeypatch.setattr(hr, "SentenceTransformerEmbeddings", FakeSTEmb)
 
-        kwargs = STE.call_args.kwargs
-        assert kwargs["model_kwargs"]["device"] == "cpu"
-        assert kwargs["encode_kwargs"]["batch_size"] == 16
+    return {"fake_faiss": fake_faiss, "captured_ensemble": captured}
 
-        out = capsys.readouterr().out
-        # In the try-path it prints "cpu" (fallback prints a different message)
-        assert "Embeddings using cpu" in out
+# ---------- Tests ----------
 
+def test_pick_device_respects_preference_cpu(monkeypatch, hp_patch, dummy_docs, patch_heavy_deps):
+    r = hr.HybridRetriever(dummy_docs, device_preference="cpu")
+    assert r.device == "cpu"
 
-def test_gpu_path_exception_falls_back_to_cpu(monkeypatch, capsys):
-    chunks = ["c1"]
+def test_pick_device_cuda_when_available(monkeypatch, hp_patch, dummy_docs, patch_heavy_deps):
+    monkeypatch.setattr(hr.torch.cuda, "is_available", lambda: True)
+    r = hr.HybridRetriever(dummy_docs)
+    assert r.device == "cuda:0"
 
-    # Force an exception inside the try-block
-    with patch.object(mod, "SentenceTransformerEmbeddings", side_effect=RuntimeError("boom")), \
-         patch.object(mod, "setup_cpu_embeddings", autospec=True) as fallback:
+def test_dense_embeddings_uses_qwen3_when_name_matches(monkeypatch, hp_patch, dummy_docs, patch_heavy_deps):
+    monkeypatch.setattr(hr, "hp", types.SimpleNamespace(
+        EMBEDDING_NAME="Qwen3-Embedding-xyz",
+        SPARSE_RATIO=0.4,
+        RETRIEVAL_K=4
+    ))
+    r = hr.HybridRetriever(dummy_docs, embedding_name="qwen3-embedding-awesome", device_preference="cpu")
+    emb = r._dense_embeddings()
+    # Should be instance of custom Qwen3Embeddings (not the fallback)
+    assert isinstance(emb, hr.Qwen3Embeddings)
+    # Ensure it constructed our CaptureST with the right model/device
+    assert isinstance(emb.model, CaptureST)
+    assert emb.model.model_name == "qwen3-embedding-awesome"
+    assert emb.model.device == "cpu"
 
-        fallback.return_value = "CPU_RET"
-        result = mod.setup_gpu_embeddings(chunks)
+def test_qwen3_embeddings_embed_documents_and_query(monkeypatch, hp_patch, patch_heavy_deps):
+    q = hr.Qwen3Embeddings(model_name="qwen3-embedding", device="cpu", query_prompt_name="query")
+    vecs = q.embed_documents(["a", "b", "c"])
+    assert isinstance(vecs, list) and len(vecs) == 3 and all(len(v) == 3 for v in vecs)
 
-        assert result == "CPU_RET"
-        fallback.assert_called_once_with(chunks)
+    q.embed_query("hello world")
+    # Verify prompt_name flowed through to encode
+    assert q.model.calls[-1]["kwargs"].get("prompt_name") == "query"
+    # normalize_embeddings should be True by default per implementation
+    assert q.model.calls[-1]["kwargs"].get("normalize_embeddings") is True
 
-        out = capsys.readouterr().out
-        assert "GPU embeddings failed: boom" in out
+def test_sparse_retriever_assigns_missing_ids(monkeypatch, hp_patch, dummy_docs, patch_heavy_deps):
+    r = hr.HybridRetriever(dummy_docs, device_preference="cpu")
+    bm25 = r._setup_sparse_retriever()
 
+    # First doc keeps existing id from metadata
+    assert dummy_docs[0].id == "keep-existing"
+    # Others should be auto-assigned
+    assert isinstance(dummy_docs[1].id, str) and dummy_docs[1].id.startswith("doc-")
+    assert isinstance(dummy_docs[2].id, str) and dummy_docs[2].id.startswith("doc-")
 
-def test_setup_cpu_embeddings_builds_vectorstore_and_uses_k(capsys):
-    chunks = ["c1", "c2"]
-    fake_vs, retriever_obj = _make_fake_vectorstore()
+    # BM25 k should match retrieval_k
+    assert bm25.k == r.retrieval_k == hr.hp.RETRIEVAL_K
 
-    with patch.object(mod, "SentenceTransformerEmbeddings", autospec=True) as STE, \
-         patch.object(mod, "Chroma", autospec=True) as Chroma:
+def test_dense_retriever_wires_faiss_and_k(monkeypatch, hp_patch, dummy_docs, patch_heavy_deps):
+    r = hr.HybridRetriever(dummy_docs, device_preference="cpu")
+    dense = r._setup_dense_retriever()
 
-        Chroma.from_documents.return_value = fake_vs
+    # FAISS.from_documents called with docs, embeddings, and cosine distance
+    fa = patch_heavy_deps["fake_faiss"]
+    assert fa.last_args[0] == dummy_docs
+    # embeddings object is passed as second positional arg
+    assert hasattr(fa.last_args[1], "embed_documents") or hasattr(fa.last_args[1], "model_name")
+    assert fa.last_kwargs.get("distance_strategy") == hr.DistanceStrategy.COSINE
 
-        result = mod.setup_cpu_embeddings(chunks)
-        assert result is retriever_obj
+    # as_retriever called with the module's hp.RETRIEVAL_K
+    assert dense.kind == "dense_retriever"
+    assert dense.kwargs == {"search_kwargs": {"k": hr.hp.RETRIEVAL_K}}
 
-        # CPU builder does NOT pass device; only trust_remote_code
-        kwargs = STE.call_args.kwargs
-        assert kwargs["model_name"] == "fake-embed-model"
-        assert kwargs["model_kwargs"] == {"trust_remote_code": True}
-        assert "encode_kwargs" not in kwargs  # not used in CPU helper
+def test_hybrid_retriever_builds_ensemble_with_normalized_weights(monkeypatch, hp_patch, dummy_docs, patch_heavy_deps):
+    # Give an out-of-range sparse_ratio; should clamp to [0,1]
+    r = hr.HybridRetriever(dummy_docs, sparse_ratio=2.0, device_preference="cpu")
+    cap = patch_heavy_deps["captured_ensemble"]["instance"]
+    assert isinstance(cap, CaptureEnsemble)
+    # Weights should be [1.0, 0.0] after clamping
+    assert cap.weights == [1.0, 0.0]
+    # Should contain two retrievers (sparse, dense) in that order
+    assert len(cap.retrievers) == 2
 
-        # as_retriever is called with RETRIEVAL_K from hp
-        fake_vs.as_retriever.assert_called_once_with(search_kwargs={"k": 7})
-
-        # Persist directory wired through
-        _, ch_kwargs = Chroma.from_documents.call_args
-        assert ch_kwargs["persist_directory"] == "./chroma_db"
-
-        out = capsys.readouterr().out
-        assert "Embeddings using CPU (fallback)" in out
+def test_as_retriever_returns_ensemble_instance(monkeypatch, hp_patch, dummy_docs, patch_heavy_deps):
+    r = hr.HybridRetriever(dummy_docs, device_preference="cpu")
+    ens = r.as_retriever()
+    cap = patch_heavy_deps["captured_ensemble"]["instance"]
+    assert ens is cap
