@@ -5,7 +5,7 @@ A robust, modular Retrieval-Augmented Generation (RAG) boilerplate for building,
 ## ✨ Features
 
 - 🔌 **Plug-and-play architecture:** Swap out retrievers, models, and pipelines with minimal code changes.
-- 🗃️ **ChromaDB integration:** Efficient vector storage and retrieval using ChromaDB.
+- 🗃️ **FAISS integration:** Efficient vector storage and retrieval using FAISS.
 - 📊 **Evaluation suite:** Built-in tools for evaluating RAG pipeline performance.
 - 📓 **Jupyter notebook demo:** Quick start and experimentation in `src/demo.ipynb`.
 - 🧩 **Extensible:** Easily add new retrievers, models, or data loaders.
@@ -16,13 +16,13 @@ A robust, modular Retrieval-Augmented Generation (RAG) boilerplate for building,
 RAG-Boilerplate/
 ├── data/                # Data files (e.g., HobbitBook.txt, hobbit_qna.json)
 ├── src/                 # Source code
-│   ├── chroma_db/       # ChromaDB database
 │   ├── demo.ipynb       # Jupyter notebook demo
 │   ├── evaluate.py      # Evaluation utilities
 │   ├── hyperparameters.py # Hyperparameter configs
 │   ├── loader.py        # Data loading utilities
 │   ├── model.py         # Model wrapper(s)
 │   ├── pipeline.py      # RAG pipeline logic
+│   ├── reranker.py      # Reranker implementations
 │   └── retriever.py     # Retriever implementations
 ├── tests/               # Unit tests
 ├── requirements.txt     # Python dependencies
